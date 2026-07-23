@@ -1,0 +1,131 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: cdr_phase2_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: cdr_system
+    ports:
+      - "3306:3306"
+    volumes:
+      # Konteyner silinse veya yeniden baslasa bile CDR verilerinin kalici kalmasini saglar.
+      - cdr_mysql_data:/var/lib/mysql
+    healthcheck:
+      # Konteynerin yalnizca baslamasini degil, MySQL'in baglanti kabul etmeye hazir olmasini kontrol eder.
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  adminer:
+    image: adminer:latest
+    container_name: cdr_phase2_adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  kafka:
+    image: apache/kafka:4.1.2
+    container_name: cdr_phase2_kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes:
+      - cdr_phase2_kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1"]
+      interval: 10s
+      # Kafka CLI'nin JVM baslangici da dahil olmak uzere tamamlanmasi icin yeterli sure taninir.
+      timeout: 30s
+      retries: 12
+      start_period: 20s
+
+  # Kafka hazir oldugunda yalnizca cdr-raw-topic olusturur ve basariyla durur.
+  kafka-init:
+    # Kafka CLI araci, cdr-raw-topic'i olusturmak icin kullanilir.
+    image: apache/kafka:4.1.2
+    container_name: cdr_phase2_kafka_init
+    restart: "no"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        exec /opt/kafka/bin/kafka-topics.sh
+        --bootstrap-server kafka:9092
+        --create
+        --if-not-exists
+        --topic cdr-raw-topic
+        --partitions 1
+        --replication-factor 1
+
+  # Kafka'dan CDR okur, dogrular, ucretini hesaplar ve MySQL'e yazar.
+  cdr-process-service:
+    build:
+      context: ./cdr-process-service
+    container_name: cdr_process_service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cdr_system
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CDR_RAW_TOPIC: cdr-raw-topic
+
+  # Yalnizca MySQL'den CDR okur ve GET endpoint'lerini sunar.
+  cdr-report-service:
+    build:
+      context: ./cdr-report-service
+    container_name: cdr_report_service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cdr_system
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "8082:8080"
+
+  # Her saniye sahte CDR JSON'u uretir ve dogrudan Kafka topic'ine yazar.
+  cdr-generator:
+    build:
+      context: ./cdr-generator
+    container_name: cdr_generator
+    restart: unless-stopped
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CDR_RAW_TOPIC: cdr-raw-topic
+      GENERATION_INTERVAL_SECONDS: 1
+
+volumes: # konteynırlar kapansa bile bu veriler silinmez
+  cdr_mysql_data:   #MySQL’deki cdr_system, cdrs tablosu ve CDR kayıtları
+  cdr_phase2_kafka_data:  #Kafka topic, mesaj ve Kafka metadata verileri

@@ -1,0 +1,77 @@
+import json
+import logging
+import os
+import random
+import time
+import uuid
+from datetime import datetime, timedelta
+
+from kafka import KafkaProducer
+from kafka.errors import KafkaError, NoBrokersAvailable
+
+
+BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+TOPIC = os.getenv("CDR_RAW_TOPIC", "cdr-raw-topic")
+INTERVAL_SECONDS = float(os.getenv("GENERATION_INTERVAL_SECONDS", "1"))
+#bağlantı ayarlarıdır.docker compose dan alır
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+
+def random_digits(length: int) -> str:
+    return "".join(random.choices("0123456789", k=length))
+
+
+def create_fake_cdr() -> dict:
+    conversation_duration = random.randint(10, 600)
+    start_time = datetime.now().replace(microsecond=0) - timedelta(seconds=random.randint(0, 3600))
+    return {
+        "eventId": str(uuid.uuid4()),
+        "startTime": start_time.isoformat(),
+        "endTime": (start_time + timedelta(seconds=conversation_duration)).isoformat(),
+        "imsi": "28601" + random_digits(10),
+        "imei": random_digits(14),
+        "cellId": random.randint(1, 500),
+        "lacId": random.randint(1, 100),
+        "aNumber": "5" + random_digits(9),
+        "bNumber": "5" + random_digits(9),
+        "setupDuration": random.randint(1, 15),
+        "conversationDuration": conversation_duration,
+        "direction": random.choice(["MO", "MT"]),
+        "result": "ANSWERED",
+    }
+
+
+def connect_producer() -> KafkaProducer:
+    while True:
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers=BOOTSTRAP_SERVERS,   #kafka adresi(kafka:9092)
+                value_serializer=lambda value: json.dumps(value).encode("utf-8"),   #python dic datasını json a çevirir.
+                acks="all", #Kafka mesajın broker tarafından kabul edildiğini onaylamadan gönderimi başarılı sayma.
+                retries=5,
+            )
+            logging.info("Kafka baglantisi hazir. broker=%s topic=%s", BOOTSTRAP_SERVERS, TOPIC)
+            return producer
+        except NoBrokersAvailable:
+            logging.warning("Kafka henuz hazir degil. 3 saniye sonra tekrar denenecek.")
+            time.sleep(3)
+
+
+def run() -> None:
+    producer = connect_producer()
+    while True: #generatorun sürekli çalışmasını sağlar
+        cdr = create_fake_cdr()
+        try:
+            producer.send(TOPIC, value=cdr).get(timeout=10)
+            logging.info("CDR Kafka'ya gonderildi. eventId=%s", cdr["eventId"])
+        except KafkaError:
+            logging.exception("CDR Kafka'ya gonderilemedi; Kafka baglantisi yenilenecek.")
+            producer.close()
+            producer = connect_producer()
+            continue
+        time.sleep(INTERVAL_SECONDS)
+
+
+if __name__ == "__main__":
+    run()
