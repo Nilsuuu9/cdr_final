@@ -27,6 +27,7 @@ public class CdrKafkaListener {
             RawCdrMessage message = objectMapper.readValue(payload, RawCdrMessage.class);
             cdrProcessingService.process(message);
         } catch (JsonProcessingException | InvalidCdrMessageException exception) {
+            // Skip invalid messages so one malformed payload does not block the consumer.
             log.warn("Gecersiz CDR mesaji atlandi. reason={}, payload={}", exception.getMessage(), payload);
         }
     }

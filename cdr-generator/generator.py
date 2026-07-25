@@ -42,6 +42,7 @@ def create_fake_cdr() -> dict:
 
 
 def connect_producer() -> KafkaProducer:
+    # The generator may start before Kafka, so keep retrying until the broker is available.
     while True:
         try:
             producer = KafkaProducer(
