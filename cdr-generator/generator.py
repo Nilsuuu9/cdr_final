@@ -13,7 +13,6 @@ from kafka.errors import KafkaError, NoBrokersAvailable
 BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 TOPIC = os.getenv("CDR_RAW_TOPIC", "cdr-raw-topic")
 INTERVAL_SECONDS = float(os.getenv("GENERATION_INTERVAL_SECONDS", "1"))
-#bağlantı ayarlarıdır.docker compose dan alır
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -46,9 +45,9 @@ def connect_producer() -> KafkaProducer:
     while True:
         try:
             producer = KafkaProducer(
-                bootstrap_servers=BOOTSTRAP_SERVERS,   #kafka adresi(kafka:9092)
-                value_serializer=lambda value: json.dumps(value).encode("utf-8"),   #python dic datasını json a çevirir.
-                acks="all", #Kafka mesajın broker tarafından kabul edildiğini onaylamadan gönderimi başarılı sayma.
+                bootstrap_servers=BOOTSTRAP_SERVERS,
+                value_serializer=lambda value: json.dumps(value).encode("utf-8"),
+                acks="all",
                 retries=5,
             )
             logging.info("Kafka baglantisi hazir. broker=%s topic=%s", BOOTSTRAP_SERVERS, TOPIC)
@@ -60,7 +59,7 @@ def connect_producer() -> KafkaProducer:
 
 def run() -> None:
     producer = connect_producer()
-    while True: #generatorun sürekli çalışmasını sağlar
+    while True:
         cdr = create_fake_cdr()
         try:
             producer.send(TOPIC, value=cdr).get(timeout=10)

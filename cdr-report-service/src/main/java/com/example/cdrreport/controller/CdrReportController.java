@@ -20,7 +20,6 @@ public class CdrReportController {
         this.cdrQueryService = cdrQueryService;
     }
 
-    //tüm kayıtları listeleme:
     @GetMapping
     public ResponseEntity<List<CdrResponse>> getAllCdrs() {
         return ResponseEntity.ok(cdrQueryService.getAll().stream().map(this::toResponse).toList());

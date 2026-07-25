@@ -21,13 +21,12 @@ public class CdrKafkaListener {
         this.cdrProcessingService = cdrProcessingService;
     }
 
-    @KafkaListener(topics = "${cdr.kafka.topic}")  //cdr-raw-topice mesaj gelirse bu metodu çalıştır.
+    @KafkaListener(topics = "${cdr.kafka.topic}")
     public void consume(String payload) {
         try {
-            RawCdrMessage message = objectMapper.readValue(payload, RawCdrMessage.class); //kafkadan önce ham json metni gelir bu kısım jsonu java nesnesine çevirir
-            cdrProcessingService.process(message);   //mesaj service katmanına gider
-        } catch (JsonProcessingException | InvalidCdrMessageException exception) { //geçersiz json veya cdr gelirse mesaj loglanır ve atlanır.aynı hatalı mesajın sonsuza kadar tekrar denenmesi engellenir.
-            // Gecersiz veri tekrar tekrar denenmez; loglanir ve consumer bir sonraki mesaja gecer.
+            RawCdrMessage message = objectMapper.readValue(payload, RawCdrMessage.class);
+            cdrProcessingService.process(message);
+        } catch (JsonProcessingException | InvalidCdrMessageException exception) {
             log.warn("Gecersiz CDR mesaji atlandi. reason={}, payload={}", exception.getMessage(), payload);
         }
     }

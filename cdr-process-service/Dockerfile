@@ -8,7 +8,6 @@ COPY src ./src
 RUN mvn package -DskipTests -B
 
 FROM eclipse-temurin:21-jre
-#Bu, daha küçük olan gerçek çalışma ortamıdır. Maven burada yoktur; yalnızca Java uygulamasını çalıştırmak için gereken JRE vardır.
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
 

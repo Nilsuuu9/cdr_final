@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-@Transactional(readOnly = true) //servis içi transactionlar okuma amaçlıdır.
+@Transactional(readOnly = true)
 public class CdrQueryService {
     private final CdrRepository cdrRepository;
 
@@ -18,9 +18,9 @@ public class CdrQueryService {
 
     public List<Cdr> getAll() {
         return cdrRepository.findAll();
-    } //tüm kayıtları getirir
+    }
 
     public List<Cdr> getByCallerNumber(String callerNumber) {
         return cdrRepository.findByANumber(callerNumber);
-    }  //arayan numaraya göre filtreleme
+    }
 }

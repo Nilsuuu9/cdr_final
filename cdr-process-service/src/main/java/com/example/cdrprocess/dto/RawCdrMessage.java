@@ -2,7 +2,6 @@ package com.example.cdrprocess.dto;
 
 import java.time.LocalDateTime;
 
-/** Kafka'dan gelen ham CDR JSON sozlesmesi. */
 public record RawCdrMessage(
         String eventId,
         LocalDateTime startTime,

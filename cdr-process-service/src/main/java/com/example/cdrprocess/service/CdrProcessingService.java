@@ -24,8 +24,8 @@ public class CdrProcessingService {
     }
 
     @Transactional
-    public void process(RawCdrMessage message) {  //Bu metot içindeki veritabanı işlemleri transaction içinde çalışır.İşlem başarılıysa kayıt kalıcı olur,Hata olursa işlem geri alınabilir.
-        validate(message);   //İlk işlem doğrulamadır
+    public void process(RawCdrMessage message) {
+        validate(message);
 
         if (cdrRepository.existsByEventId(message.eventId())) {
             log.info("Ayni eventId ile gelen tekrar mesaj atlandi. eventId={}", message.eventId());
@@ -67,7 +67,3 @@ public class CdrProcessingService {
 }
 
 
-//throw new InvalidCdrMessageException(...) = geçersiz olan durunlarda çıkan sonuç
-//tekrar gelen eventlerde sonuç= if (cdrRepository.existsByEventId(message.eventId()))
-
-//Sonra Kafka mesajı Cdr entity’sine dönüştürülür ve MySQL’e kaydedilir.

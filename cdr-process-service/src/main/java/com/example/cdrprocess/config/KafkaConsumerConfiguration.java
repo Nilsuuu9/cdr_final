@@ -16,11 +16,11 @@ import java.util.Map;
 public class KafkaConsumerConfiguration {
 
     @Bean
-    ConsumerFactory<String, String> consumerFactory(  //Kafka’dan gelen mesajın hem key hem value bölümünü String olarak alır.
+    ConsumerFactory<String, String> consumerFactory(
             @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
             @Value("${spring.kafka.consumer.group-id}") String groupId) {
         Map<String, Object> properties = new HashMap<>();
-        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers); //kafka adresini verir
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);

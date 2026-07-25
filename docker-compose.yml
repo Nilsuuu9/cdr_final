@@ -9,10 +9,8 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      # Konteyner silinse veya yeniden baslasa bile CDR verilerinin kalici kalmasini saglar.
       - cdr_mysql_data:/var/lib/mysql
     healthcheck:
-      # Konteynerin yalnizca baslamasini degil, MySQL'in baglanti kabul etmeye hazir olmasini kontrol eder.
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
       interval: 10s
       timeout: 5s
@@ -52,14 +50,11 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1"]
       interval: 10s
-      # Kafka CLI'nin JVM baslangici da dahil olmak uzere tamamlanmasi icin yeterli sure taninir.
       timeout: 30s
       retries: 12
       start_period: 20s
 
-  # Kafka hazir oldugunda yalnizca cdr-raw-topic olusturur ve basariyla durur.
   kafka-init:
-    # Kafka CLI araci, cdr-raw-topic'i olusturmak icin kullanilir.
     image: apache/kafka:4.1.2
     container_name: cdr_phase2_kafka_init
     restart: "no"
@@ -78,7 +73,6 @@ services:
         --partitions 1
         --replication-factor 1
 
-  # Kafka'dan CDR okur, dogrular, ucretini hesaplar ve MySQL'e yazar.
   cdr-process-service:
     build:
       context: ./cdr-process-service
@@ -96,7 +90,6 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CDR_RAW_TOPIC: cdr-raw-topic
 
-  # Yalnizca MySQL'den CDR okur ve GET endpoint'lerini sunar.
   cdr-report-service:
     build:
       context: ./cdr-report-service
@@ -112,7 +105,6 @@ services:
     ports:
       - "8082:8080"
 
-  # Her saniye sahte CDR JSON'u uretir ve dogrudan Kafka topic'ine yazar.
   cdr-generator:
     build:
       context: ./cdr-generator
@@ -126,6 +118,6 @@ services:
       CDR_RAW_TOPIC: cdr-raw-topic
       GENERATION_INTERVAL_SECONDS: 1
 
-volumes: # konteynırlar kapansa bile bu veriler silinmez
-  cdr_mysql_data:   #MySQL’deki cdr_system, cdrs tablosu ve CDR kayıtları
+volumes:
+  cdr_mysql_data:
   cdr_phase2_kafka_data:  #Kafka topic, mesaj ve Kafka metadata verileri

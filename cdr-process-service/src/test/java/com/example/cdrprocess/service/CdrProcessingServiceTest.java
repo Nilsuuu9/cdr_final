@@ -18,7 +18,7 @@ import static org.mockito.Mockito.when;
 class CdrProcessingServiceTest {
     @Test
     void calculatesChargeAndSavesNewMessage() {
-        CdrRepository repository = mock(CdrRepository.class); //bu test gerçek mysql veya kafka çalıştırmaz.sahte repository oluşturur
+        CdrRepository repository = mock(CdrRepository.class);
         when(repository.existsByEventId("event-1")).thenReturn(false);
         when(repository.save(any(Cdr.class))).thenAnswer(invocation -> invocation.getArgument(0));
         CdrProcessingService service = new CdrProcessingService(repository);

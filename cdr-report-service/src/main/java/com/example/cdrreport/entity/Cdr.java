@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 public class Cdr {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;  //Bu entity kayıt eklemese bile id alanının MySQL’de otomatik üretilen alan olduğunu tanır. Report service save() çağırmadığı için burada yeni ID üretmez.
+    private Long id;
 
     @Column(name = "event_id")
     private String eventId;
