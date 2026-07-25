@@ -16,6 +16,21 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: cdr_phase3_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - cdr_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   adminer:
     image: adminer:latest
     container_name: cdr_phase2_adminer
@@ -98,10 +113,14 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cdr_system
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8082:8080"
 
@@ -120,4 +139,5 @@ services:
 
 volumes:
   cdr_mysql_data:
-  cdr_phase2_kafka_data:  #Kafka topic, mesaj ve Kafka metadata verileri
+  cdr_redis_data:
+  cdr_phase2_kafka_data:
