@@ -4,12 +4,17 @@ import com.example.cdrprocess.dto.RawCdrMessage;
 import com.example.cdrprocess.entity.Cdr;
 import com.example.cdrprocess.exception.InvalidCdrMessageException;
 import com.example.cdrprocess.repository.CdrRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.Validator;
+import jakarta.validation.ConstraintViolation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -18,13 +23,15 @@ public class CdrProcessingService {
     private static final BigDecimal PRICE_PER_SECOND = new BigDecimal("0.05");
 
     private final CdrRepository cdrRepository;
+    private final Validator validator;
 
-    public CdrProcessingService(CdrRepository cdrRepository) {
+    public CdrProcessingService(CdrRepository cdrRepository, Validator validator) {
         this.cdrRepository = cdrRepository;
+        this.validator = validator;
     }
 
     @Transactional
-    public void process(RawCdrMessage message) {
+    public void process(@Valid RawCdrMessage message) {
         validate(message);
 
         if (cdrRepository.existsByEventId(message.eventId())) {
@@ -50,19 +57,18 @@ public class CdrProcessingService {
     }
 
     private void validate(RawCdrMessage message) {
-        if (message == null || isBlank(message.eventId()) || message.startTime() == null || message.endTime() == null
-                || isBlank(message.aNumber()) || isBlank(message.bNumber()) || message.conversationDuration() == null
-                || message.conversationDuration() < 0 || message.setupDuration() == null || message.setupDuration() < 0) {
-            throw new InvalidCdrMessageException("The CDR message is missing required fields or contains an invalid duration.");
+        if (message == null) {
+            throw new InvalidCdrMessageException("The CDR message must not be null.");
         }
 
-        if (message.endTime().isBefore(message.startTime())) {
-            throw new InvalidCdrMessageException("The CDR end time cannot be before its start time.");
+        Set<ConstraintViolation<RawCdrMessage>> violations = validator.validate(message);
+        if (!violations.isEmpty()) {
+            String validationMessage = violations.stream()
+                    .map(ConstraintViolation::getMessage)
+                    .sorted()
+                    .collect(Collectors.joining(" "));
+            throw new InvalidCdrMessageException(validationMessage);
         }
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 }
 
