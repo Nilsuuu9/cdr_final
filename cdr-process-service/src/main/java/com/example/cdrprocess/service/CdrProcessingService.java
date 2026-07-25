@@ -28,7 +28,7 @@ public class CdrProcessingService {
         validate(message);
 
         if (cdrRepository.existsByEventId(message.eventId())) {
-            log.info("Ayni eventId ile gelen tekrar mesaj atlandi. eventId={}", message.eventId());
+            log.info("Skipped duplicate message with the same eventId. eventId={}", message.eventId());
             return;
         }
 
@@ -39,7 +39,7 @@ public class CdrProcessingService {
                 message.conversationDuration(), message.direction(), message.result(), chargeAmount
         );
         Cdr savedCdr = cdrRepository.save(cdr);
-        log.info("CDR Kafka'dan okunup veritabanina yazildi. eventId={}, id={}, chargeAmount={}",
+        log.info("CDR read from Kafka and persisted to the database. eventId={}, id={}, chargeAmount={}",
                 message.eventId(), savedCdr.getId(), chargeAmount);
     }
 
@@ -53,11 +53,11 @@ public class CdrProcessingService {
         if (message == null || isBlank(message.eventId()) || message.startTime() == null || message.endTime() == null
                 || isBlank(message.aNumber()) || isBlank(message.bNumber()) || message.conversationDuration() == null
                 || message.conversationDuration() < 0 || message.setupDuration() == null || message.setupDuration() < 0) {
-            throw new InvalidCdrMessageException("CDR mesaji zorunlu alanlari icermiyor veya gecersiz sureye sahip.");
+            throw new InvalidCdrMessageException("The CDR message is missing required fields or contains an invalid duration.");
         }
 
         if (message.endTime().isBefore(message.startTime())) {
-            throw new InvalidCdrMessageException("CDR bitis zamani baslangic zamanindan once olamaz.");
+            throw new InvalidCdrMessageException("The CDR end time cannot be before its start time.");
         }
     }
 

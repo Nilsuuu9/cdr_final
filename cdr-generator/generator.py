@@ -51,10 +51,10 @@ def connect_producer() -> KafkaProducer:
                 acks="all",
                 retries=5,
             )
-            logging.info("Kafka baglantisi hazir. broker=%s topic=%s", BOOTSTRAP_SERVERS, TOPIC)
+            logging.info("Kafka connection is ready. broker=%s topic=%s", BOOTSTRAP_SERVERS, TOPIC)
             return producer
         except NoBrokersAvailable:
-            logging.warning("Kafka henuz hazir degil. 3 saniye sonra tekrar denenecek.")
+            logging.warning("Kafka is not ready yet. Retrying in 3 seconds.")
             time.sleep(3)
 
 
@@ -64,9 +64,9 @@ def run() -> None:
         cdr = create_fake_cdr()
         try:
             producer.send(TOPIC, value=cdr).get(timeout=10)
-            logging.info("CDR Kafka'ya gonderildi. eventId=%s", cdr["eventId"])
+            logging.info("CDR sent to Kafka. eventId=%s", cdr["eventId"])
         except KafkaError:
-            logging.exception("CDR Kafka'ya gonderilemedi; Kafka baglantisi yenilenecek.")
+            logging.exception("Failed to send CDR to Kafka; the Kafka connection will be renewed.")
             producer.close()
             producer = connect_producer()
             continue
