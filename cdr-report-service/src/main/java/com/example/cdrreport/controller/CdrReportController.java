@@ -1,7 +1,6 @@
 package com.example.cdrreport.controller;
 
 import com.example.cdrreport.dto.CdrResponse;
-import com.example.cdrreport.mapper.CdrReportMapper;
 import com.example.cdrreport.service.CdrQueryService;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
@@ -18,21 +17,19 @@ import java.util.List;
 @RequestMapping("/api/cdrs")
 public class CdrReportController {
     private final CdrQueryService cdrQueryService;
-    private final CdrReportMapper cdrReportMapper;
 
-    public CdrReportController(CdrQueryService cdrQueryService, CdrReportMapper cdrReportMapper) {
+    public CdrReportController(CdrQueryService cdrQueryService) {
         this.cdrQueryService = cdrQueryService;
-        this.cdrReportMapper = cdrReportMapper;
     }
 
     @GetMapping
     public ResponseEntity<List<CdrResponse>> getAllCdrs() {
-        return ResponseEntity.ok(cdrReportMapper.toResponseList(cdrQueryService.getAll()));
+        return ResponseEntity.ok(cdrQueryService.getAll());
     }
 
     @GetMapping("/by-caller/{phoneNumber}")
     public ResponseEntity<List<CdrResponse>> getByCaller(
             @PathVariable @NotBlank(message = "Phone number must not be blank.") String phoneNumber) {
-        return ResponseEntity.ok(cdrReportMapper.toResponseList(cdrQueryService.getByCallerNumber(phoneNumber)));
+        return ResponseEntity.ok(cdrQueryService.getByCallerNumber(phoneNumber));
     }
 }

@@ -1,7 +1,6 @@
 package com.example.cdrreport.exception;
 
 import com.example.cdrreport.controller.CdrReportController;
-import com.example.cdrreport.mapper.CdrReportMapper;
 import com.example.cdrreport.service.CdrQueryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,9 +22,6 @@ class GlobalExceptionHandlerTest {
 
     @MockitoBean
     private CdrQueryService cdrQueryService;
-
-    @MockitoBean
-    private CdrReportMapper cdrReportMapper;
 
     @Test
     void getByCaller_shouldReturnBadRequestForBlankPhoneNumber() throws Exception {
