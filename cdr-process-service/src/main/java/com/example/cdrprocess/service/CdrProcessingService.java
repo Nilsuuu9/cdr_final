@@ -2,12 +2,15 @@ package com.example.cdrprocess.service;
 
 import com.example.cdrprocess.dto.RawCdrMessage;
 import com.example.cdrprocess.entity.Cdr;
+import com.example.cdrprocess.config.CdrCacheKeys;
 import com.example.cdrprocess.exception.InvalidCdrMessageException;
 import com.example.cdrprocess.repository.CdrRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.validation.ConstraintViolation;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,10 +27,15 @@ public class CdrProcessingService {
 
     private final CdrRepository cdrRepository;
     private final Validator validator;
+    private final StringRedisTemplate redisTemplate;
 
-    public CdrProcessingService(CdrRepository cdrRepository, Validator validator) {
+    public CdrProcessingService(
+            CdrRepository cdrRepository,
+            Validator validator,
+            StringRedisTemplate redisTemplate) {
         this.cdrRepository = cdrRepository;
         this.validator = validator;
+        this.redisTemplate = redisTemplate;
     }
 
     @Transactional
@@ -46,6 +54,7 @@ public class CdrProcessingService {
                 message.conversationDuration(), message.direction(), message.result(), chargeAmount
         );
         Cdr savedCdr = cdrRepository.save(cdr);
+        invalidateCallerCache(message.aNumber());
         log.info("CDR read from Kafka and persisted to the database. eventId={}, id={}, chargeAmount={}",
                 message.eventId(), savedCdr.getId(), chargeAmount);
     }
@@ -68,6 +77,16 @@ public class CdrProcessingService {
                     .sorted()
                     .collect(Collectors.joining(" "));
             throw new InvalidCdrMessageException(validationMessage);
+        }
+    }
+
+    private void invalidateCallerCache(String callerNumber) {
+        String cacheKey = CdrCacheKeys.byCaller(callerNumber);
+        try {
+            boolean deleted = redisTemplate.delete(cacheKey);
+            log.info("Invalidated caller cache. key={}, deleted={}", cacheKey, deleted);
+        } catch (DataAccessException exception) {
+            log.warn("Could not invalidate caller cache. key={}", cacheKey, exception);
         }
     }
 }

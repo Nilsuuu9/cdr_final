@@ -98,12 +98,16 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cdr_system
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CDR_RAW_TOPIC: cdr-raw-topic
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
 
   cdr-report-service:
     build:
