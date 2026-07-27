@@ -80,11 +80,18 @@ services:
       - /bin/sh
       - -c
       - >
-        exec /opt/kafka/bin/kafka-topics.sh
+        /opt/kafka/bin/kafka-topics.sh
         --bootstrap-server kafka:9092
         --create
         --if-not-exists
         --topic cdr-raw-topic
+        --partitions 1
+        --replication-factor 1 &&
+        /opt/kafka/bin/kafka-topics.sh
+        --bootstrap-server kafka:9092
+        --create
+        --if-not-exists
+        --topic cdr-raw-topic-dlt
         --partitions 1
         --replication-factor 1
 
@@ -106,6 +113,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CDR_RAW_TOPIC: cdr-raw-topic
+      CDR_DLT_TOPIC: cdr-raw-topic-dlt
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
