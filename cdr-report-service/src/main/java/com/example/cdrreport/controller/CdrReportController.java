@@ -1,7 +1,7 @@
 package com.example.cdrreport.controller;
 
 import com.example.cdrreport.dto.CdrResponse;
-import com.example.cdrreport.entity.Cdr;
+import com.example.cdrreport.mapper.CdrReportMapper;
 import com.example.cdrreport.service.CdrQueryService;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
@@ -18,25 +18,21 @@ import java.util.List;
 @RequestMapping("/api/cdrs")
 public class CdrReportController {
     private final CdrQueryService cdrQueryService;
+    private final CdrReportMapper cdrReportMapper;
 
-    public CdrReportController(CdrQueryService cdrQueryService) {
+    public CdrReportController(CdrQueryService cdrQueryService, CdrReportMapper cdrReportMapper) {
         this.cdrQueryService = cdrQueryService;
+        this.cdrReportMapper = cdrReportMapper;
     }
 
     @GetMapping
     public ResponseEntity<List<CdrResponse>> getAllCdrs() {
-        return ResponseEntity.ok(cdrQueryService.getAll().stream().map(this::toResponse).toList());
+        return ResponseEntity.ok(cdrReportMapper.toResponseList(cdrQueryService.getAll()));
     }
 
     @GetMapping("/by-caller/{phoneNumber}")
     public ResponseEntity<List<CdrResponse>> getByCaller(
             @PathVariable @NotBlank(message = "Phone number must not be blank.") String phoneNumber) {
-        return ResponseEntity.ok(cdrQueryService.getByCallerNumber(phoneNumber).stream().map(this::toResponse).toList());
-    }
-
-    private CdrResponse toResponse(Cdr cdr) {
-        return new CdrResponse(cdr.getId(), cdr.getEventId(), cdr.getStartTime(), cdr.getEndTime(),
-                cdr.getANumber(), cdr.getBNumber(), cdr.getSetupDuration(), cdr.getConversationDuration(),
-                cdr.getDirection(), cdr.getResult(), cdr.getChargeAmount());
+        return ResponseEntity.ok(cdrReportMapper.toResponseList(cdrQueryService.getByCallerNumber(phoneNumber)));
     }
 }
