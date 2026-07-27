@@ -128,13 +128,14 @@ services:
     build:
       context: ./cdr-generator
     container_name: cdr_generator
-    restart: unless-stopped
+    restart: "no"
     depends_on:
       kafka-init:
         condition: service_completed_successfully
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CDR_RAW_TOPIC: cdr-raw-topic
+      CDR_RECORD_COUNT: 100
       GENERATION_INTERVAL_SECONDS: 1
 
 volumes:

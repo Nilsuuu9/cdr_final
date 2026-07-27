@@ -13,6 +13,7 @@ from kafka.errors import KafkaError, NoBrokersAvailable
 BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 TOPIC = os.getenv("CDR_RAW_TOPIC", "cdr-raw-topic")
 INTERVAL_SECONDS = float(os.getenv("GENERATION_INTERVAL_SECONDS", "1"))
+RECORD_COUNT = int(os.getenv("CDR_RECORD_COUNT", "100"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -58,19 +59,33 @@ def connect_producer() -> KafkaProducer:
             time.sleep(3)
 
 
-def run() -> None:
+def run(record_count: int = RECORD_COUNT) -> None:
     producer = connect_producer()
-    while True:
-        cdr = create_fake_cdr()
-        try:
-            producer.send(TOPIC, value=cdr).get(timeout=10)
-            logging.info("CDR sent to Kafka. eventId=%s", cdr["eventId"])
-        except KafkaError:
-            logging.exception("Failed to send CDR to Kafka; the Kafka connection will be renewed.")
-            producer.close()
-            producer = connect_producer()
-            continue
-        time.sleep(INTERVAL_SECONDS)
+    try:
+        for index in range(record_count):
+            cdr = create_fake_cdr()
+            while True:
+                try:
+                    producer.send(TOPIC, value=cdr).get(timeout=10)
+                    logging.info(
+                        "CDR sent to Kafka. progress=%s/%s eventId=%s",
+                        index + 1,
+                        record_count,
+                        cdr["eventId"],
+                    )
+                    break
+                except KafkaError:
+                    logging.exception("Failed to send CDR to Kafka; the Kafka connection will be renewed.")
+                    producer.close()
+                    producer = connect_producer()
+
+            if index < record_count - 1:
+                time.sleep(INTERVAL_SECONDS)
+    finally:
+        producer.flush()
+        producer.close()
+
+    logging.info("Generated and sent %s CDR records. Exiting.", record_count)
 
 
 if __name__ == "__main__":
