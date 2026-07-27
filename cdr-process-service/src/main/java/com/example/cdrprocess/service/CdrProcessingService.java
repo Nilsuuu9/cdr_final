@@ -5,6 +5,8 @@ import com.example.cdrprocess.entity.Cdr;
 import com.example.cdrprocess.config.CdrCacheKeys;
 import com.example.cdrprocess.exception.InvalidCdrMessageException;
 import com.example.cdrprocess.repository.CdrRepository;
+import com.example.cdrprocess.tariff.SubscriberTariffClient;
+import com.example.cdrprocess.tariff.TariffChargingService;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.validation.ConstraintViolation;
@@ -15,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -23,19 +24,23 @@ import java.util.stream.Collectors;
 @Service
 public class CdrProcessingService {
 
-    private static final BigDecimal PRICE_PER_SECOND = new BigDecimal("0.05");
-
     private final CdrRepository cdrRepository;
     private final Validator validator;
     private final StringRedisTemplate redisTemplate;
+    private final SubscriberTariffClient subscriberTariffClient;
+    private final TariffChargingService tariffChargingService;
 
     public CdrProcessingService(
             CdrRepository cdrRepository,
             Validator validator,
-            StringRedisTemplate redisTemplate) {
+            StringRedisTemplate redisTemplate,
+            SubscriberTariffClient subscriberTariffClient,
+            TariffChargingService tariffChargingService) {
         this.cdrRepository = cdrRepository;
         this.validator = validator;
         this.redisTemplate = redisTemplate;
+        this.subscriberTariffClient = subscriberTariffClient;
+        this.tariffChargingService = tariffChargingService;
     }
 
     @Transactional
@@ -47,7 +52,9 @@ public class CdrProcessingService {
             return;
         }
 
-        BigDecimal chargeAmount = calculateCharge(message.conversationDuration());
+        String tariffType = subscriberTariffClient.getTariff(message.aNumber());
+        BigDecimal chargeAmount = tariffChargingService.calculateCharge(
+                tariffType, message.conversationDuration());
         Cdr cdr = new Cdr(
                 message.eventId(), message.startTime(), message.endTime(), message.imsi(), message.imei(),
                 message.cellId(), message.lacId(), message.aNumber(), message.bNumber(), message.setupDuration(),
@@ -55,14 +62,8 @@ public class CdrProcessingService {
         );
         Cdr savedCdr = cdrRepository.save(cdr);
         invalidateCallerCache(message.aNumber());
-        log.info("CDR read from Kafka and persisted to the database. eventId={}, id={}, chargeAmount={}",
-                message.eventId(), savedCdr.getId(), chargeAmount);
-    }
-
-    private BigDecimal calculateCharge(Long conversationDuration) {
-        return PRICE_PER_SECOND
-                .multiply(BigDecimal.valueOf(conversationDuration))
-                .setScale(2, RoundingMode.HALF_UP);
+        log.info("CDR read from Kafka and persisted to the database. eventId={}, id={}, tariffType={}, chargeAmount={}",
+                message.eventId(), savedCdr.getId(), tariffType, chargeAmount);
     }
 
     private void validate(RawCdrMessage message) {

@@ -4,6 +4,8 @@ import com.example.cdrprocess.dto.RawCdrMessage;
 import com.example.cdrprocess.entity.Cdr;
 import com.example.cdrprocess.exception.InvalidCdrMessageException;
 import com.example.cdrprocess.repository.CdrRepository;
+import com.example.cdrprocess.tariff.SubscriberTariffClient;
+import com.example.cdrprocess.tariff.TariffChargingService;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
@@ -27,7 +29,10 @@ class CdrProcessingServiceTest {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         when(repository.existsByEventId("event-1")).thenReturn(false);
         when(repository.save(any(Cdr.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        CdrProcessingService service = new CdrProcessingService(repository, validator(), redisTemplate);
+        SubscriberTariffClient tariffClient = mock(SubscriberTariffClient.class);
+        when(tariffClient.getTariff("5551112233")).thenReturn("Standard");
+        CdrProcessingService service = new CdrProcessingService(
+                repository, validator(), redisTemplate, tariffClient, new TariffChargingService());
 
         LocalDateTime start = LocalDateTime.of(2026, 7, 22, 10, 0);
         RawCdrMessage message = new RawCdrMessage("event-1", start, start.plusSeconds(120), "286011234567890",
@@ -36,6 +41,7 @@ class CdrProcessingServiceTest {
 
         ArgumentCaptor<Cdr> cdrCaptor = ArgumentCaptor.forClass(Cdr.class);
         verify(repository).save(cdrCaptor.capture());
+        verify(tariffClient).getTariff("5551112233");
         verify(redisTemplate).delete("cdrs:by-caller:5551112233");
         assertThat(cdrCaptor.getValue().getChargeAmount()).isEqualByComparingTo(new BigDecimal("6.00"));
     }
@@ -43,7 +49,8 @@ class CdrProcessingServiceTest {
     @Test
     void process_shouldRejectNegativeConversationDuration() {
         CdrRepository repository = mock(CdrRepository.class);
-        CdrProcessingService service = new CdrProcessingService(repository, validator(), mock(StringRedisTemplate.class));
+        CdrProcessingService service = new CdrProcessingService(repository, validator(),
+                mock(StringRedisTemplate.class), mock(SubscriberTariffClient.class), new TariffChargingService());
         LocalDateTime start = LocalDateTime.of(2026, 7, 22, 10, 0);
         RawCdrMessage message = new RawCdrMessage("event-2", start, start.plusSeconds(120), "286011234567890",
                 "12345678901234", 1, 1, "5551112233", "5554445566", 3L, -1L, "MO", "ANSWERED");
@@ -56,7 +63,8 @@ class CdrProcessingServiceTest {
     @Test
     void process_shouldRejectMissingCallerNumber() {
         CdrRepository repository = mock(CdrRepository.class);
-        CdrProcessingService service = new CdrProcessingService(repository, validator(), mock(StringRedisTemplate.class));
+        CdrProcessingService service = new CdrProcessingService(repository, validator(),
+                mock(StringRedisTemplate.class), mock(SubscriberTariffClient.class), new TariffChargingService());
         LocalDateTime start = LocalDateTime.of(2026, 7, 22, 10, 0);
         RawCdrMessage message = new RawCdrMessage("event-3", start, start.plusSeconds(120), "286011234567890",
                 "12345678901234", 1, 1, " ", "5554445566", 3L, 120L, "MO", "ANSWERED");
