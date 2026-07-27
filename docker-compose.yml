@@ -95,6 +95,14 @@ services:
         --partitions 1
         --replication-factor 1
 
+  subscriber-tariff-service:
+    build:
+      context: ./subscriber-tariff-service
+    container_name: cdr_subscriber_tariff_service
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+
   cdr-process-service:
     build:
       context: ./cdr-process-service
@@ -107,6 +115,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      subscriber-tariff-service:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cdr_system
       SPRING_DATASOURCE_USERNAME: root
@@ -116,6 +126,8 @@ services:
       CDR_DLT_TOPIC: cdr-raw-topic-dlt
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      TARIFF_SERVICE_HOST: subscriber-tariff-service
+      TARIFF_SERVICE_PORT: 9090
 
   cdr-report-service:
     build:
