@@ -4,6 +4,7 @@ import com.example.cdrprocess.service.CdrProcessingService;
 import com.example.cdrprocess.dto.RawCdrMessage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
 import org.springframework.kafka.core.KafkaTemplate;
 
@@ -11,6 +12,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -21,7 +23,7 @@ class CdrKafkaListenerTest {
 
     @Test
     void consume_shouldSendInvalidJsonToDeadLetterTopic() throws Exception {
-        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
         CdrProcessingService processingService = mock(CdrProcessingService.class);
         KafkaTemplate<String, String> kafkaTemplate = mock(KafkaTemplate.class);
         given(kafkaTemplate.send(eq("cdr-raw-topic-dlt"), anyString()))
@@ -46,13 +48,14 @@ class CdrKafkaListenerTest {
 
     @Test
     void consume_shouldSendProcessingFailureToDeadLetterTopic() throws Exception {
-        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
         CdrProcessingService processingService = mock(CdrProcessingService.class);
         KafkaTemplate<String, String> kafkaTemplate = mock(KafkaTemplate.class);
         RawCdrMessage message = new RawCdrMessage(
                 "event-1", java.time.LocalDateTime.now(), java.time.LocalDateTime.now(),
                 null, null, null, null, "5551112233", "5554445566", 0L, 1L, "MO", "ANSWERED");
         given(objectMapper.readValue("valid-json", RawCdrMessage.class)).willReturn(message);
+        given(objectMapper.writeValueAsString(any())).willReturn("{\"deadLetter\":true}");
         given(kafkaTemplate.send(eq("cdr-raw-topic-dlt"), anyString()))
                 .willReturn(CompletableFuture.completedFuture(null));
         org.mockito.Mockito.doThrow(new IllegalStateException("Processing failed"))
@@ -68,7 +71,7 @@ class CdrKafkaListenerTest {
 
     @Test
     void consume_shouldProcessValidMessageWithoutSendingToDeadLetterTopic() throws Exception {
-        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
         CdrProcessingService processingService = mock(CdrProcessingService.class);
         KafkaTemplate<String, String> kafkaTemplate = mock(KafkaTemplate.class);
         RawCdrMessage message = new RawCdrMessage(
