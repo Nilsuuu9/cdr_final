@@ -10,11 +10,29 @@ services:
       - "3306:3306"
     volumes:
       - cdr_mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
+
+  cdr-reset:
+    image: mysql:8.4
+    container_name: cdr_reset
+    restart: "no"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        until mysql -h mysql -uroot -p"$${MYSQL_PASSWORD}" -e "SELECT 1 FROM cdr_system.cdrs LIMIT 1" >/dev/null 2>&1;
+        do sleep 2; done;
+        mysql -h mysql -uroot -p"$${MYSQL_PASSWORD}" cdr_system -e "TRUNCATE TABLE cdrs";
+        echo "CDR table reset completed."
 
   redis:
     image: redis:7.4-alpine
@@ -30,6 +48,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  cache-reset:
+    image: redis:7.4-alpine
+    container_name: cdr_cache_reset
+    restart: "no"
+    depends_on:
+      redis:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        redis-cli -h redis FLUSHDB;
+        echo "Redis cache reset completed."
 
   adminer:
     image: adminer:latest
@@ -111,10 +142,14 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      cdr-reset:
+        condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      cache-reset:
+        condition: service_completed_successfully
       subscriber-tariff-service:
         condition: service_started
     environment:
@@ -139,6 +174,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      cdr-reset:
+        condition: service_completed_successfully
+      cache-reset:
+        condition: service_completed_successfully
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cdr_system
       SPRING_DATASOURCE_USERNAME: root
@@ -155,6 +194,8 @@ services:
     restart: "no"
     depends_on:
       kafka-init:
+        condition: service_completed_successfully
+      cdr-reset:
         condition: service_completed_successfully
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
