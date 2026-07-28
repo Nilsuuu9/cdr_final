@@ -1,21 +1,28 @@
 package com.example.cdrreport.config;
 
+import com.example.cdrreport.dto.CdrResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
-import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
+import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import java.util.List;
 
 import java.time.Duration;
 
 @Configuration
 public class RedisConfiguration {
 
-    private GenericJacksonJsonRedisSerializer jsonSerializer() {
-        return new GenericJacksonJsonRedisSerializer(new tools.jackson.databind.ObjectMapper());
+    private RedisSerializer<Object> jsonSerializer() {
+        tools.jackson.databind.ObjectMapper objectMapper = new tools.jackson.databind.ObjectMapper();
+        tools.jackson.databind.JavaType responseListType = objectMapper.getTypeFactory()
+                .constructCollectionType(List.class, CdrResponse.class);
+        return new JacksonJsonRedisSerializer<>(objectMapper, responseListType);
     }
 
     @Bean
