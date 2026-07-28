@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cdr-report-service
+  namespace: cdr-system
+spec:
+  selector:
+    app: cdr-report-service
+  type: NodePort
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30082

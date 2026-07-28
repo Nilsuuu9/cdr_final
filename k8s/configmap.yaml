@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cdr-config
+  namespace: cdr-system
+data:
+  MYSQL_DATABASE: cdr_system
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  CDR_RAW_TOPIC: cdr-raw-topic
+  CDR_DLT_TOPIC: cdr-raw-topic-dlt
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  TARIFF_SERVICE_HOST: subscriber-tariff-service
+  TARIFF_SERVICE_PORT: "9090"
