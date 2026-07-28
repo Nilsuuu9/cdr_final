@@ -25,11 +25,11 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void getByCaller_shouldReturnBadRequestForBlankPhoneNumber() throws Exception {
-        mockMvc.perform(get("/api/cdrs/by-caller/%20"))
+        mockMvc.perform(get("/api/cdrs/by-caller/{phoneNumber}", " "))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.error").value("Invalid request"))
-                .andExpect(jsonPath("$.path").value("/api/cdrs/by-caller/ "));
+                .andExpect(jsonPath("$.path").value("/api/cdrs/by-caller/%20"));
     }
 
     @Test
