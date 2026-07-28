@@ -7,6 +7,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class SubscriberTariffApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(SubscriberTariffApplication.class, args);
+        var context = SpringApplication.run(SubscriberTariffApplication.class, args);
+        try {
+            context.getBean(SubscriberTariffGrpcServer.class).awaitTermination();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

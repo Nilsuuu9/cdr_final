@@ -27,6 +27,10 @@ public class SubscriberTariffGrpcServer {
         server.start();
     }
 
+    public void awaitTermination() throws InterruptedException {
+        server.awaitTermination();
+    }
+
     @PreDestroy
     public void stop() {
         server.shutdown();
