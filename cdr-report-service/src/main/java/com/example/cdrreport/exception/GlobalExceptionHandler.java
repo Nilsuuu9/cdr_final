@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,10 +28,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleValidationException(
             Exception exception,
             HttpServletRequest request) {
-        log.error("Database request failed. path={}", request.getRequestURI(), exception);
+        log.warn("Validation failed. path={}", request.getRequestURI(), exception);
         return buildError(
                 HttpStatus.BAD_REQUEST,
                 "Invalid request",
+                exception.getMessage(),
+                request
+        );
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException exception,
+            HttpServletRequest request) {
+        return buildError(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                "Method not allowed",
                 exception.getMessage(),
                 request
         );
