@@ -7,12 +7,14 @@ import com.example.cdrreport.repository.CdrRepository;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
 import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
+@Slf4j
 public class CdrQueryService {
     private static final Duration CACHE_TTL = Duration.ofMinutes(10);
 
@@ -35,14 +37,25 @@ public class CdrQueryService {
 
     public List<CdrResponse> getByCallerNumber(String callerNumber) {
         String cacheKey = CdrCacheKeys.byCaller(callerNumber);
-        List<CdrResponse> cachedResponses = readCachedResponses(cacheKey);
+        List<CdrResponse> cachedResponses;
+        try {
+            cachedResponses = readCachedResponses(cacheKey);
+        } catch (RuntimeException exception) {
+            log.error("Failed to read caller responses from Redis. key={}", cacheKey, exception);
+            throw exception;
+        }
         if (cachedResponses != null) {
             return cachedResponses;
         }
 
         List<CdrResponse> responses = cdrReportMapper.toResponseList(
                 cdrRepository.findByANumber(callerNumber));
-        redisTemplate.opsForValue().set(cacheKey, responses, CACHE_TTL);
+        try {
+            redisTemplate.opsForValue().set(cacheKey, responses, CACHE_TTL);
+        } catch (RuntimeException exception) {
+            log.error("Failed to write caller responses to Redis. key={}", cacheKey, exception);
+            throw exception;
+        }
         return responses;
     }
 

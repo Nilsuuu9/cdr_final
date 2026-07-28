@@ -9,11 +9,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler({
             InvalidRequestException.class,
@@ -23,6 +27,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleValidationException(
             Exception exception,
             HttpServletRequest request) {
+        log.error("Database request failed. path={}", request.getRequestURI(), exception);
         return buildError(
                 HttpStatus.BAD_REQUEST,
                 "Invalid request",
@@ -47,6 +52,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleUnexpectedException(
             Exception exception,
             HttpServletRequest request) {
+        log.error("Unexpected request failure. path={}", request.getRequestURI(), exception);
         return buildError(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Internal server error",
