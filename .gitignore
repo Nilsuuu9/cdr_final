@@ -1,0 +1,9 @@
+# IntelliJ IDEA local files
+.idea/
+
+# Maven build output
+target/
+
+# Python cache files
+__pycache__/
+*.py[cod]
