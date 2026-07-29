@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: subscriber-tariff-service
+  namespace: cdr-system
+spec:
+  selector:
+    app: subscriber-tariff-service
+  ports:
+    - port: 9090
+      targetPort: 9090

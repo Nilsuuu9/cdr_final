@@ -6,4 +6,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY generator.py .
 CMD ["python", "generator.py"]
-#cdr-generator konteyneri açık kaldığı sürece Python scripti sürekli çalışır.

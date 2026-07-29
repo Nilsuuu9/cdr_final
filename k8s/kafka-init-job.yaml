@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init
+  namespace: cdr-system
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: kafka-init
+          image: apache/kafka:4.1.2
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list;
+              do sleep 5; done;
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic cdr-raw-topic --partitions 1 --replication-factor 1;
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic cdr-raw-topic-dlt --partitions 1 --replication-factor 1

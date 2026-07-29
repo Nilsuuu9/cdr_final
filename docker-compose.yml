@@ -9,14 +9,58 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      # Konteyner silinse veya yeniden baslasa bile CDR verilerinin kalici kalmasini saglar.
       - cdr_mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      # Konteynerin yalnizca baslamasini degil, MySQL'in baglanti kabul etmeye hazir olmasini kontrol eder.
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
+
+  cdr-reset:
+    image: mysql:8.4
+    container_name: cdr_reset
+    restart: "no"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        until mysql -h mysql -uroot -p"$${MYSQL_PASSWORD}" -e "SELECT 1 FROM cdr_system.cdrs LIMIT 1" >/dev/null 2>&1;
+        do sleep 2; done;
+        mysql -h mysql -uroot -p"$${MYSQL_PASSWORD}" cdr_system -e "TRUNCATE TABLE cdrs";
+        echo "CDR table reset completed."
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: cdr_phase3_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - cdr_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cache-reset:
+    image: redis:7.4-alpine
+    container_name: cdr_cache_reset
+    restart: "no"
+    depends_on:
+      redis:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        redis-cli -h redis FLUSHDB;
+        echo "Redis cache reset completed."
 
   adminer:
     image: adminer:latest
@@ -52,14 +96,11 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1"]
       interval: 10s
-      # Kafka CLI'nin JVM baslangici da dahil olmak uzere tamamlanmasi icin yeterli sure taninir.
       timeout: 30s
       retries: 12
       start_period: 20s
 
-  # Kafka hazir oldugunda yalnizca cdr-raw-topic olusturur ve basariyla durur.
   kafka-init:
-    # Kafka CLI araci, cdr-raw-topic'i olusturmak icin kullanilir.
     image: apache/kafka:4.1.2
     container_name: cdr_phase2_kafka_init
     restart: "no"
@@ -70,15 +111,29 @@ services:
       - /bin/sh
       - -c
       - >
-        exec /opt/kafka/bin/kafka-topics.sh
+        /opt/kafka/bin/kafka-topics.sh
         --bootstrap-server kafka:9092
         --create
         --if-not-exists
         --topic cdr-raw-topic
         --partitions 1
+        --replication-factor 1 &&
+        /opt/kafka/bin/kafka-topics.sh
+        --bootstrap-server kafka:9092
+        --create
+        --if-not-exists
+        --topic cdr-raw-topic-dlt
+        --partitions 1
         --replication-factor 1
 
-  # Kafka'dan CDR okur, dogrular, ucretini hesaplar ve MySQL'e yazar.
+  subscriber-tariff-service:
+    build:
+      context: ./subscriber-tariff-service
+    container_name: cdr_subscriber_tariff_service
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+
   cdr-process-service:
     build:
       context: ./cdr-process-service
@@ -87,16 +142,28 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      cdr-reset:
+        condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      cache-reset:
+        condition: service_completed_successfully
+      subscriber-tariff-service:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cdr_system
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CDR_RAW_TOPIC: cdr-raw-topic
+      CDR_DLT_TOPIC: cdr-raw-topic-dlt
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TARIFF_SERVICE_HOST: subscriber-tariff-service
+      TARIFF_SERVICE_PORT: 9090
 
-  # Yalnizca MySQL'den CDR okur ve GET endpoint'lerini sunar.
   cdr-report-service:
     build:
       context: ./cdr-report-service
@@ -105,27 +172,38 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      cdr-reset:
+        condition: service_completed_successfully
+      cache-reset:
+        condition: service_completed_successfully
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cdr_system
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8082:8080"
 
-  # Her saniye sahte CDR JSON'u uretir ve dogrudan Kafka topic'ine yazar.
   cdr-generator:
     build:
       context: ./cdr-generator
     container_name: cdr_generator
-    restart: unless-stopped
+    restart: "no"
     depends_on:
       kafka-init:
+        condition: service_completed_successfully
+      cdr-reset:
         condition: service_completed_successfully
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CDR_RAW_TOPIC: cdr-raw-topic
+      CDR_RECORD_COUNT: 100
       GENERATION_INTERVAL_SECONDS: 1
 
-volumes: # konteynırlar kapansa bile bu veriler silinmez
-  cdr_mysql_data:   #MySQL’deki cdr_system, cdrs tablosu ve CDR kayıtları
-  cdr_phase2_kafka_data:  #Kafka topic, mesaj ve Kafka metadata verileri
+volumes:
+  cdr_mysql_data:
+  cdr_redis_data:
+  cdr_phase2_kafka_data:

@@ -1,12 +1,12 @@
-# CDR System - Faz 2
+# CDR System - Phase 2
 
-Bu proje sahte CDR (Call Detail Record) verisi ureten, Kafka ile isleyen ve raporlayan mikroservis yapisidir.
+This project is a microservice system that generates sample CDR (Call Detail Record) data, processes it with Kafka, and provides reporting endpoints.
 
-## Mimari
+## Architecture
 
 ```text
 cdr-generator
-  Her saniye rastgele CDR JSON'u uretir.
+  Generates a random CDR JSON message every second.
           |
           | kafka:9092 / cdr-raw-topic
           v
@@ -14,69 +14,69 @@ Kafka
           |
           v
 cdr-process-service
-  Mesaji dogrular, ucret hesaplar ve MySQL'e yazar.
+  Validates messages, calculates charges, and writes records to MySQL.
           |
           v
 MySQL / cdr_system / cdrs
           |
           v
 cdr-report-service
-  Sadece CDR kayitlarini okur ve GET endpoint'lerini sunar.
+  Reads CDR records and exposes GET endpoints.
           |
           v
 http://localhost:8082
 
 Adminer
-  MySQL verisini tarayicidan kontrol etmek icin kullanilir.
+  Used to inspect MySQL data in a browser.
   http://localhost:8081
 ```
 
-Servis sorumluluklari:
+Service responsibilities:
 
-- `cdr-generator`: CDR uretir; MySQL'e veya REST endpoint'ine yazmaz.
-- `cdr-process-service`: Kafka'dan okur ve MySQL'e yazar; REST endpoint'i yoktur.
-- `cdr-report-service`: MySQL'den okur; Kafka dinlemez ve CDR yazmaz.
-- `kafka-init`: `cdr-raw-topic` topic'ini bir kez olusturur, sonra `Exited (0)` durumunda durur.
+- `cdr-generator`: Generates CDR messages; it does not write to MySQL or a REST endpoint.
+- `cdr-process-service`: Reads from Kafka and writes to MySQL; it has no REST endpoint.
+- `cdr-report-service`: Reads from MySQL; it does not consume Kafka messages or write CDR records.
+- `kafka-init`: Creates the `cdr-raw-topic` topic once and then exits with status `Exited (0)`.
 
-## Sistemi Baslatma
+## Starting the System
 
-Docker Desktop acikken proje kok dizininde su komutu calistir:
+With Docker Desktop running, execute the following command from the project root:
 
 ```powershell
 docker compose up -d --build
 ```
 
-Bu tek komut MySQL, Kafka, Adminer, topic olusturucu, Python generator, process service ve report service'i baslatir.
+This command starts MySQL, Kafka, Adminer, the topic initializer, the Python generator, the process service, and the report service.
 
-Durumu kontrol etmek icin:
+To check the service status:
 
 ```powershell
 docker compose ps
 ```
 
-Canli process service loglari:
+Live process service logs:
 
 ```powershell
 docker compose logs -f cdr-process-service
 ```
 
-Sistemi kapatmak icin:
+To stop the system:
 
 ```powershell
 docker compose down
 ```
 
-`down -v` kullanma; MySQL ve Kafka volume verilerini de siler.
+Do not use `down -v`; it also deletes the MySQL and Kafka volume data.
 
-## Endpoint Ornekleri
+## Endpoint Examples
 
-Report service adresi:
+Report service URL:
 
 ```text
 http://localhost:8082
 ```
 
-### Tum CDR Kayitlari
+### All CDR Records
 
 ```http
 GET /api/cdrs
@@ -86,7 +86,7 @@ GET /api/cdrs
 Invoke-RestMethod http://localhost:8082/api/cdrs
 ```
 
-Ornek cevap:
+Example response:
 
 ```json
 [
@@ -106,7 +106,7 @@ Ornek cevap:
 ]
 ```
 
-### Arayan Numaraya Gore CDR Sorgulama
+### Query CDR Records by Caller Number
 
 ```http
 GET /api/cdrs/by-caller/{phoneNumber}
@@ -116,24 +116,24 @@ GET /api/cdrs/by-caller/{phoneNumber}
 Invoke-RestMethod http://localhost:8082/api/cdrs/by-caller/5551112233
 ```
 
-Faz 2'de manuel CDR olusturan `POST` endpoint'i yoktur. Yeni CDR'lar yalnizca Python generator tarafindan Kafka'ya gonderilir.
+Phase 2 does not provide a `POST` endpoint for manually creating CDR records. New CDRs are sent to Kafka only by the Python generator.
 
-## Adminer ile MySQL Kontrolu
+## Inspecting MySQL with Adminer
 
-Tarayicidan ac:
+Open the following URL in a browser:
 
 ```text
 http://localhost:8081
 ```
 
-Giris bilgileri:
+Login details:
 
 ```text
 System: MySQL
 Server: mysql
 Username: root
-Password: .env dosyasindaki MYSQL_PASSWORD degeri
+Password: The `MYSQL_PASSWORD` value from the `.env` file
 Database: cdr_system
 ```
 
-`cdrs` tablosunda process service'in yazdigi CDR kayitlarini gorebilirsin.
+The CDR records written by the process service are available in the `cdrs` table.

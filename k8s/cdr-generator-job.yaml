@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cdr-generator
+  namespace: cdr-system
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: cdr-generator
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: cdr-generator
+          image: cdr-generator:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: cdr-config
+          env:
+            - name: CDR_RECORD_COUNT
+              value: "100"
+            - name: GENERATION_INTERVAL_SECONDS
+              value: "1"

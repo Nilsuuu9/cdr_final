@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscriber-tariff-service
+  namespace: cdr-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subscriber-tariff-service
+  template:
+    metadata:
+      labels:
+        app: subscriber-tariff-service
+    spec:
+      containers:
+        - name: subscriber-tariff-service
+          image: subscriber-tariff-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9090

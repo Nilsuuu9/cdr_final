@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cdr-report-service
+  namespace: cdr-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cdr-report-service
+  template:
+    metadata:
+      labels:
+        app: cdr-report-service
+    spec:
+      containers:
+        - name: cdr-report-service
+          image: cdr-report-service:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/cdr_system
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: cdr-secrets
+                  key: SPRING_DATASOURCE_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cdr-secrets
+                  key: MYSQL_ROOT_PASSWORD
+          envFrom:
+            - configMapRef:
+                name: cdr-config
+          ports:
+            - containerPort: 8080

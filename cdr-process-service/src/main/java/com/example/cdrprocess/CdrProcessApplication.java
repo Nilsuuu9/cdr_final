@@ -4,7 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.kafka.annotation.EnableKafka;
 
-@EnableKafka  //@KafkaListener içeren sınıfları bul, Kafka consumer olarak başlat ve çalışır durumda tut.Bu anotasyon olmazsa Java uygulaması açılır ama Kafka listener çalışmaz.
+@EnableKafka
 @SpringBootApplication
 public class CdrProcessApplication {
 
@@ -15,4 +15,3 @@ public class CdrProcessApplication {
 
 
 
-// springboot başlama uygulamasıdır.
